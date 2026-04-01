@@ -1,0 +1,9 @@
+{
+    "display_name": "Animated Cursor",
+    "version": "1.0.0",
+    "js": "index.js",
+    "description": "Apply animated cursors from cursors-4u.com to SillyTavern",
+    "author": "custom",
+    "homePage": "",
+    "requires": []
+}
