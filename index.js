@@ -26,11 +26,34 @@ if (settings.textCssUrl === undefined) settings.textCssUrl = '';
 
 // ─── CSS 가져오기 ────────────────────────────────────────────
 
+const cssCache = new Map();
+
 async function fetchCSS(url) {
+    if (cssCache.has(url)) return cssCache.get(url);
+
+    const sessionKey = 'ac_css_' + url;
+    try {
+        const cached = sessionStorage.getItem(sessionKey);
+        if (cached) {
+            cssCache.set(url, cached);
+            return cached;
+        }
+    } catch (_) {}
+
     const direct = await fetch(url).catch(() => null);
-    if (direct && direct.ok) return await direct.text();
+    if (direct && direct.ok) {
+        const text = await direct.text();
+        cssCache.set(url, text);
+        try { sessionStorage.setItem(sessionKey, text); } catch (_) {}
+        return text;
+    }
     const proxied = await fetch(CORS_PROXY + encodeURIComponent(url)).catch(() => null);
-    if (proxied && proxied.ok) return await proxied.text();
+    if (proxied && proxied.ok) {
+        const text = await proxied.text();
+        cssCache.set(url, text);
+        try { sessionStorage.setItem(sessionKey, text); } catch (_) {}
+        return text;
+    }
     return null;
 }
 
@@ -41,20 +64,43 @@ function extractCursorValue(css) {
 
 // ─── 스타일 주입 ─────────────────────────────────────────────
 
-function injectStyle(cursorValue, isText) {
+function injectStyle(cursorValue, isText, rawCss) {
     const id = isText ? TEXT_STYLE_ID : STYLE_ID;
     document.getElementById(id)?.remove();
     const el = document.createElement('style');
     el.id = id;
-    if (isText) {
-        el.textContent = `
+
+    const hasAnimation = rawCss && /@keyframes\s+cursor-anim/i.test(rawCss);
+
+    if (hasAnimation) {
+        const keyframesMatch = rawCss.match(/@keyframes\s+cursor-anim\s*\{[\s\S]*?\}\s*\}/i);
+        const keyframesOnly = keyframesMatch ? keyframesMatch[0] : '';
+        const durationMatch = rawCss.match(/animation\s*:[^;}]*?([\d.]+m?s)/i);
+        const duration = durationMatch ? durationMatch[1] : '600ms';
+
+        if (isText) {
+            const renamedKeyframes = keyframesOnly.replace(/cursor-anim/g, 'cursor-anim-text');
+            el.textContent = renamedKeyframes + `
+input, input[type="text"], input[type="search"], input[type="email"],
+input[type="password"], input[type="url"], input[type="number"],
+textarea, [contenteditable], [contenteditable="true"] {
+    animation: cursor-anim-text ${duration} step-end infinite !important;
+}`;
+        } else {
+            el.textContent = keyframesOnly + `
+*, *::before, *::after { animation: cursor-anim ${duration} step-end infinite !important; }`;
+        }
+    } else {
+        if (isText) {
+            el.textContent = `
 input, input[type="text"], input[type="search"], input[type="email"],
 input[type="password"], input[type="url"], input[type="number"],
 textarea, [contenteditable], [contenteditable="true"] {
     cursor: ${cursorValue} !important;
 }`;
-    } else {
-        el.textContent = `*, *::before, *::after { cursor: ${cursorValue} !important; }`;
+        } else {
+            el.textContent = `*, *::before, *::after { cursor: ${cursorValue} !important; }`;
+        }
     }
     document.head.appendChild(el);
 }
@@ -68,6 +114,8 @@ function removeTextStyle() {
 }
 
 // ─── 적용 ────────────────────────────────────────────────────
+
+const SAFE_CURSOR = /^(?:url\(["']?(?:https?:\/\/|data:image\/)[^)]*["']?\)\s*(?:\d+\s+\d+\s*)?[,\s]*)+(?:\s*\w+)?$/i;
 
 async function fetchAndApplyCursor(url, isText = false) {
     const statusTarget = isText ? 'text' : 'global';
@@ -84,6 +132,13 @@ async function fetchAndApplyCursor(url, isText = false) {
         return;
     }
 
+    const hasAnimation = /@keyframes\s+cursor-anim/i.test(css);
+    if (hasAnimation) {
+        injectStyle(null, isText, css);
+        showStatus(statusTarget, isText ? '✅ 입력창 커서 적용됨' : '✅ 커서 적용됨', 'ok');
+        return;
+    }
+
     const cursorValue = extractCursorValue(css);
     if (!cursorValue) {
         const fallback = css.match(/cursor\s*:\s*([^;]+)/i);
@@ -91,9 +146,18 @@ async function fetchAndApplyCursor(url, isText = false) {
             showStatus(statusTarget, '❌ CSS에서 cursor 속성을 찾지 못했어요.', 'error');
             return;
         }
-        injectStyle(fallback[1].trim(), isText);
+        const fallbackValue = fallback[1].trim();
+        if (!SAFE_CURSOR.test(fallbackValue)) {
+            showStatus(statusTarget, '❌ 안전하지 않은 cursor 값이 감지됐어요.', 'error');
+            return;
+        }
+        injectStyle(fallbackValue, isText, css);
     } else {
-        injectStyle(cursorValue, isText);
+        if (!SAFE_CURSOR.test(cursorValue)) {
+            showStatus(statusTarget, '❌ 안전하지 않은 cursor 값이 감지됐어요.', 'error');
+            return;
+        }
+        injectStyle(cursorValue, isText, css);
     }
 
     showStatus(statusTarget, isText ? '✅ 입력창 커서 적용됨' : '✅ 커서 적용됨', 'ok');
@@ -372,12 +436,12 @@ function renderSettings() {
         if (e.key === 'Enter') { $('#ac-text-apply').trigger('click'); setTimeout(() => $('#ac-text-save-name').focus(), 100); }
     });
 
-    $('#ac-text-enabled').on('change', function () {
-        settings.textCursorEnabled = this.checked;
-        saveSettingsDebounced();
-        if (settings.textCursorEnabled && settings.textCssUrl) fetchAndApplyCursor(settings.textCssUrl, true);
-        else removeTextStyle();
-    });
+	$('#ac-text-enabled').on('change', function () {
+		settings.textCursorEnabled = this.checked;
+		saveSettingsDebounced();
+		if (settings.textCursorEnabled && settings.textCssUrl) fetchAndApplyCursor(settings.textCssUrl, true);
+		else removeTextStyle();
+	});
 
     $('#ac-text-save').on('click', () => {
         const url = $('#ac-text-url').val().trim();
