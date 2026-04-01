@@ -67,6 +67,7 @@ function extractCursorValue(css) {
 function injectStyle(cursorValue, isText, rawCss) {
     const id = isText ? TEXT_STYLE_ID : STYLE_ID;
 
+    // 태그가 없을 때만 새로 만들고, 있으면 재사용
     let el = document.getElementById(id);
     if (!el) {
         el = document.createElement('style');
@@ -83,24 +84,16 @@ function injectStyle(cursorValue, isText, rawCss) {
         const duration = durationMatch ? durationMatch[1] : '600ms';
 
         if (isText) {
-            // 텍스트 커서: gw-panel 내부 입력창은 제외
             const renamedKeyframes = keyframesOnly.replace(/cursor-anim/g, 'cursor-anim-text');
             el.textContent = renamedKeyframes + `
-input:not(#gw-panel input):not(.gw-panel input),
-textarea:not(#gw-panel textarea):not(.gw-panel textarea),
-[contenteditable]:not(#gw-panel [contenteditable]):not(.gw-panel [contenteditable]) {
+input, input[type="text"], input[type="search"], input[type="email"],
+input[type="password"], input[type="url"], input[type="number"],
+textarea, [contenteditable], [contenteditable="true"] {
     animation: cursor-anim-text ${duration} step-end infinite !important;
 }`;
         } else {
-            // 전체 커서: #gw-panel 자체와 그 자손은 반드시 제외
-            // gw의 togglePanel이 animationend(gw-slide-up)를 listen하므로
-            // 커서 애니메이션이 panel에 걸리면 이벤트가 오염되어 닫기가 안 됨
             el.textContent = keyframesOnly + `
-*:not(#gw-panel):not(.gw-panel):not(.gw-panel *):not(#gw-panel *),
-*:not(#gw-panel):not(.gw-panel):not(.gw-panel *):not(#gw-panel *)::before,
-*:not(#gw-panel):not(.gw-panel):not(.gw-panel *):not(#gw-panel *)::after {
-    animation: cursor-anim ${duration} step-end infinite !important;
-}`;
+*, *::before, *::after { animation: cursor-anim ${duration} step-end infinite !important; }`;
         }
     } else {
         if (isText) {
