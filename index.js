@@ -1,7 +1,7 @@
 import { saveSettingsDebounced } from '../../../../script.js';
 import { extension_settings } from '../../../extensions.js';
 
-const EXT_NAME = 'animated_cursor';
+const EXT_NAME = 'AnimatedCursor';
 const STYLE_ID = 'animated-cursor-style';
 const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 
@@ -298,7 +298,7 @@ function renderSettings() {
     $('#extensions_settings2').append(`
         <div class="inline-drawer">
             <div class="inline-drawer-toggle inline-drawer-header">
-                <b>Animated Cursor</b>
+                <b>애니커서</b>
                 <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
             </div>
             <div class="inline-drawer-content">${html}</div>
