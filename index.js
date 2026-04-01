@@ -66,10 +66,16 @@ function extractCursorValue(css) {
 
 function injectStyle(cursorValue, isText, rawCss) {
     const id = isText ? TEXT_STYLE_ID : STYLE_ID;
-    document.getElementById(id)?.remove();
-    const el = document.createElement('style');
-    el.id = id;
 
+    // 태그가 없을 때만 새로 만들고, 있으면 재사용
+    let el = document.getElementById(id);
+    if (!el) {
+        el = document.createElement('style');
+        el.id = id;
+        document.head.appendChild(el);
+    }
+
+    // 내용만 교체 → 스타일이 끊기지 않음
     const hasAnimation = rawCss && /@keyframes\s+cursor-anim/i.test(rawCss);
 
     if (hasAnimation) {
@@ -81,9 +87,7 @@ function injectStyle(cursorValue, isText, rawCss) {
         if (isText) {
             const renamedKeyframes = keyframesOnly.replace(/cursor-anim/g, 'cursor-anim-text');
             el.textContent = renamedKeyframes + `
-input, input[type="text"], input[type="search"], input[type="email"],
-input[type="password"], input[type="url"], input[type="number"],
-textarea, [contenteditable], [contenteditable="true"] {
+input, textarea, [contenteditable] {
     animation: cursor-anim-text ${duration} step-end infinite !important;
 }`;
         } else {
@@ -93,16 +97,13 @@ textarea, [contenteditable], [contenteditable="true"] {
     } else {
         if (isText) {
             el.textContent = `
-input, input[type="text"], input[type="search"], input[type="email"],
-input[type="password"], input[type="url"], input[type="number"],
-textarea, [contenteditable], [contenteditable="true"] {
+input, textarea, [contenteditable] {
     cursor: ${cursorValue} !important;
 }`;
         } else {
             el.textContent = `*, *::before, *::after { cursor: ${cursorValue} !important; }`;
         }
     }
-    document.head.appendChild(el);
 }
 
 function removeStyle() {
