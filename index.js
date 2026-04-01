@@ -67,7 +67,6 @@ function extractCursorValue(css) {
 function injectStyle(cursorValue, isText, rawCss) {
     const id = isText ? TEXT_STYLE_ID : STYLE_ID;
 
-    // 태그가 없을 때만 새로 만들고, 있으면 재사용
     let el = document.getElementById(id);
     if (!el) {
         el = document.createElement('style');
@@ -86,14 +85,18 @@ function injectStyle(cursorValue, isText, rawCss) {
         if (isText) {
             const renamedKeyframes = keyframesOnly.replace(/cursor-anim/g, 'cursor-anim-text');
             el.textContent = renamedKeyframes + `
-input, input[type="text"], input[type="search"], input[type="email"],
-input[type="password"], input[type="url"], input[type="number"],
-textarea, [contenteditable], [contenteditable="true"] {
+input:not(#gw-panel input):not(.gw-panel input),
+textarea:not(#gw-panel textarea):not(.gw-panel textarea),
+[contenteditable]:not(#gw-panel [contenteditable]):not(.gw-panel [contenteditable]) {
     animation: cursor-anim-text ${duration} step-end infinite !important;
 }`;
         } else {
             el.textContent = keyframesOnly + `
-*, *::before, *::after { animation: cursor-anim ${duration} step-end infinite !important; }`;
+*:not(#gw-panel):not(.gw-panel):not(.gw-panel *):not(#gw-panel *):not(input):not(textarea):not([contenteditable]),
+*:not(#gw-panel):not(.gw-panel):not(.gw-panel *):not(#gw-panel *):not(input):not(textarea):not([contenteditable])::before,
+*:not(#gw-panel):not(.gw-panel):not(.gw-panel *):not(#gw-panel *):not(input):not(textarea):not([contenteditable])::after {
+    animation: cursor-anim ${duration} step-end infinite !important;
+}`;
         }
     } else {
         if (isText) {
