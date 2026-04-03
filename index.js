@@ -125,13 +125,13 @@ textarea:not(#gw-panel textarea):not(.gw-panel textarea),
             const firstFrameMatch = rawCss.match(/0%\s*\{[^}]*cursor\s*:\s*(url\([^)]+\)[^;,}]*(?:,\s*\w+)?)/i);
             const fallbackCursor = firstFrameMatch ? firstFrameMatch[1].trim() : 'auto';
 
-            el.textContent = keyframesOnly + `
-html:not([data-dragging]) *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *):not(input):not(textarea):not([contenteditable]) {
+			el.textContent = keyframesOnly + `
+html:not([data-dragging]) *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *):not(input):not(textarea):not([contenteditable]):not(#char-avatar-popup):not(#persona-avatar-popup):not(.sticker-popup):not(.sticker-popup *) {
     animation: cursor-anim ${duration} step-end infinite !important;
     cursor: ${fallbackCursor};
 }
 html[data-dragging],
-html[data-dragging] *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *):not(input):not(textarea):not([contenteditable]) {
+html[data-dragging] *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *):not(input):not(textarea):not([contenteditable]):not(#char-avatar-popup):not(#persona-avatar-popup):not(.sticker-popup):not(.sticker-popup *) {
     animation: none !important;
     cursor: ${fallbackCursor} !important;
 }`;
