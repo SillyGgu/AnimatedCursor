@@ -83,7 +83,26 @@ function injectStyle(cursorValue, isText, rawCss) {
     if (!el) {
         el = document.createElement('style');
         el.id = id;
-        document.head.appendChild(el);
+        // TEXT_STYLE_ID는 항상 STYLE_ID 뒤에 위치해야 우선순위가 보장됨
+        if (isText) {
+            const globalStyle = document.getElementById(STYLE_ID);
+            if (globalStyle && globalStyle.nextSibling) {
+                document.head.insertBefore(el, globalStyle.nextSibling);
+            } else if (globalStyle) {
+                globalStyle.after(el);
+            } else {
+                document.head.appendChild(el);
+            }
+        } else {
+            // STYLE_ID는 TEXT_STYLE_ID보다 앞에 있어야 하므로
+            // TEXT_STYLE_ID가 이미 있으면 그 앞에 삽입
+            const textStyle = document.getElementById(TEXT_STYLE_ID);
+            if (textStyle) {
+                document.head.insertBefore(el, textStyle);
+            } else {
+                document.head.appendChild(el);
+            }
+        }
     }
 
     const hasAnimation = rawCss && /@keyframes\s+cursor-anim/i.test(rawCss);
@@ -97,7 +116,7 @@ function injectStyle(cursorValue, isText, rawCss) {
         if (isText) {
             const renamedKeyframes = keyframesOnly.replace(/cursor-anim/g, 'cursor-anim-text');
             el.textContent = renamedKeyframes + `
-input:not(#gw-panel input):not(.gw-panel input),
+input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not(#gw-panel input):not(.gw-panel input),
 textarea:not(#gw-panel textarea):not(.gw-panel textarea),
 [contenteditable]:not(#gw-panel [contenteditable]):not(.gw-panel [contenteditable]) {
     animation: cursor-anim-text ${duration} step-end infinite !important;
@@ -107,12 +126,12 @@ textarea:not(#gw-panel textarea):not(.gw-panel textarea),
             const fallbackCursor = firstFrameMatch ? firstFrameMatch[1].trim() : 'auto';
 
             el.textContent = keyframesOnly + `
-html:not([data-dragging]) *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *) {
+html:not([data-dragging]) *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *):not(input):not(textarea):not([contenteditable]) {
     animation: cursor-anim ${duration} step-end infinite !important;
     cursor: ${fallbackCursor};
 }
 html[data-dragging],
-html[data-dragging] *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *) {
+html[data-dragging] *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *):not(input):not(textarea):not([contenteditable]) {
     animation: none !important;
     cursor: ${fallbackCursor} !important;
 }`;
@@ -127,11 +146,11 @@ textarea:not(#gw-panel textarea):not(.gw-panel textarea),
 }`;
         } else {
             el.textContent = `
-html:not([data-dragging]) *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *) {
+html:not([data-dragging]) *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *):not(input):not(textarea):not([contenteditable]) {
     cursor: ${cursorValue} !important;
 }
 html[data-dragging],
-html[data-dragging] *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *) {
+html[data-dragging] *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *):not(input):not(textarea):not([contenteditable]) {
     cursor: ${cursorValue} !important;
 }`;
         }
