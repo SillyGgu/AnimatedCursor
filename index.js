@@ -64,6 +64,18 @@ function extractCursorValue(css) {
 
 // ─── 스타일 주입 ─────────────────────────────────────────────
 
+const CURSOR_TARGETS = `
+body,
+a, button, label, select, summary,
+[role="button"], [role="link"], [role="tab"], [role="option"], [role="menuitem"],
+[onclick], [draggable="true"],
+.menu_button, .drawer-toggle, .inline-drawer-toggle,
+.fa-solid, .fa-regular, .fa-brands, .fa-light,
+input[type="button"], input[type="submit"], input[type="reset"],
+.character_select, .character_select *, .group_select, .group_select *,
+.persona_select, .persona_select *, .world_entry, .world_entry *,
+.bogus_folder_select, .bogus_folder_select *
+`.trim();
 function injectStyle(cursorValue, isText, rawCss) {
     const id = isText ? TEXT_STYLE_ID : STYLE_ID;
 
@@ -91,23 +103,37 @@ textarea:not(#gw-panel textarea):not(.gw-panel textarea),
     animation: cursor-anim-text ${duration} step-end infinite !important;
 }`;
         } else {
+            const firstFrameMatch = rawCss.match(/0%\s*\{[^}]*cursor\s*:\s*(url\([^)]+\)[^;,}]*(?:,\s*\w+)?)/i);
+            const fallbackCursor = firstFrameMatch ? firstFrameMatch[1].trim() : 'auto';
+
             el.textContent = keyframesOnly + `
-*:not(#gw-panel):not(.gw-panel):not(.gw-panel *):not(#gw-panel *):not(input):not(textarea):not([contenteditable]),
-*:not(#gw-panel):not(.gw-panel):not(.gw-panel *):not(#gw-panel *):not(input):not(textarea):not([contenteditable])::before,
-*:not(#gw-panel):not(.gw-panel):not(.gw-panel *):not(#gw-panel *):not(input):not(textarea):not([contenteditable])::after {
+html:not([data-dragging]) *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *) {
     animation: cursor-anim ${duration} step-end infinite !important;
+    cursor: ${fallbackCursor};
+}
+html[data-dragging],
+html[data-dragging] *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *) {
+    animation: none !important;
+    cursor: ${fallbackCursor} !important;
 }`;
         }
     } else {
         if (isText) {
             el.textContent = `
-input, input[type="text"], input[type="search"], input[type="email"],
-input[type="password"], input[type="url"], input[type="number"],
-textarea, [contenteditable], [contenteditable="true"] {
+input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not(#gw-panel input):not(.gw-panel input),
+textarea:not(#gw-panel textarea):not(.gw-panel textarea),
+[contenteditable]:not(#gw-panel [contenteditable]):not(.gw-panel [contenteditable]) {
     cursor: ${cursorValue} !important;
 }`;
         } else {
-            el.textContent = `*, *::before, *::after { cursor: ${cursorValue} !important; }`;
+            el.textContent = `
+html:not([data-dragging]) *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *) {
+    cursor: ${cursorValue} !important;
+}
+html[data-dragging],
+html[data-dragging] *:not(#gw-left-btn):not(#gw-left-btn *):not(#gw-panel):not(#gw-panel *) {
+    cursor: ${cursorValue} !important;
+}`;
         }
     }
 }
@@ -124,6 +150,12 @@ function removeTextStyle() {
 
 const SAFE_CURSOR = /^(?:url\(["']?(?:https?:\/\/|data:image\/)[^)]*["']?\)\s*(?:\d+\s+\d+\s*)?[,\s]*)+(?:\s*\w+)?$/i;
 
+const IMAGE_EXTS = /\.(webp|png|gif|jpg|jpeg|svg|cur|ani)(\?.*)?$/i;
+
+function isImageUrl(url) {
+    return IMAGE_EXTS.test(url.split('?')[0]);
+}
+
 async function fetchAndApplyCursor(url, isText = false) {
     const statusTarget = isText ? 'text' : 'global';
     if (!url) {
@@ -132,6 +164,14 @@ async function fetchAndApplyCursor(url, isText = false) {
     }
 
     showStatus(statusTarget, '⏳ 불러오는 중...', 'ok');
+
+    // 이미지 URL 직접 입력 경우 — CSS 불러오지 않고 바로 주입
+    if (isImageUrl(url)) {
+        const cursorValue = `url('${url}') 32 32, auto`;
+        injectStyle(cursorValue, isText, null);
+        showStatus(statusTarget, isText ? '✅ 입력창 커서 적용됨' : '✅ 커서 적용됨', 'ok');
+        return;
+    }
 
     const css = await fetchCSS(url);
     if (!css) {
@@ -223,9 +263,21 @@ function renderCursorList(isText = false) {
         `;
 
         const nameSpan = document.createElement('span');
-        nameSpan.textContent = item.name;
-        nameSpan.style.cssText = `flex:1; font-size:12px; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;`;
+        nameSpan.style.cssText = `flex:1; font-size:12px; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; gap:4px;`;
         nameSpan.title = '클릭: 적용 / 이름 수정은 ✎ 버튼';
+
+        const badge = document.createElement('span');
+        const isImage = IMAGE_EXTS.test((item.url || '').split('?')[0]);
+        badge.textContent = isImage ? '🖼' : '🎞';
+        badge.title = isImage ? '일반 이미지 커서' : '애니메이션 CSS 커서';
+        badge.style.cssText = `font-size:11px; flex-shrink:0; opacity:0.7;`;
+
+        const nameText = document.createElement('span');
+        nameText.textContent = item.name;
+        nameText.style.cssText = `overflow:hidden; text-overflow:ellipsis; white-space:nowrap;`;
+
+        nameSpan.appendChild(badge);
+        nameSpan.appendChild(nameText);
 
         nameSpan.addEventListener('click', () => {
             if (isText) {
@@ -317,7 +369,7 @@ function renderSettings() {
 
     <div style="font-size:11px; opacity:0.5; margin-bottom:4px;">CSS URL</div>
     <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
-        <input type="text" id="ac-url" placeholder="https://..." value="${settings.cssUrl}" style="flex:1; font-size:12px; padding:4px 6px;" />
+        <input type="text" id="ac-url" placeholder="https://...css 또는 이미지 URL" value="${settings.cssUrl}" style="flex:1; font-size:12px; padding:4px 6px;" />
         <input type="button" id="ac-apply" value="적용" class="menu_button" style="white-space:nowrap;" />
     </div>
     <div id="ac-status" style="font-size:12px; margin-bottom:10px; min-height:16px;"></div>
@@ -342,7 +394,7 @@ function renderSettings() {
 
     <div style="font-size:11px; opacity:0.5; margin-bottom:4px;">입력창 커서 CSS URL</div>
     <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
-        <input type="text" id="ac-text-url" placeholder="https://..." value="${settings.textCssUrl}" style="flex:1; font-size:12px; padding:4px 6px;" />
+        <input type="text" id="ac-text-url" placeholder="https://...css 또는 이미지 URL" value="${settings.textCssUrl}" style="flex:1; font-size:12px; padding:4px 6px;" />
         <input type="button" id="ac-text-apply" value="적용" class="menu_button" style="white-space:nowrap;" />
     </div>
     <div id="ac-text-status" style="font-size:12px; margin-bottom:10px; min-height:16px;"></div>
@@ -476,6 +528,22 @@ function renderSettings() {
 }
 
 // ─── 초기화 ──────────────────────────────────────────────────
+
+document.addEventListener('dragstart', () => {
+    document.documentElement.setAttribute('data-dragging', 'true');
+});
+const _clearDragging = () => {
+    // 브라우저가 드래그 커서를 완전히 해제할 때까지 짧게 대기
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            document.documentElement.removeAttribute('data-dragging');
+        });
+    });
+};
+document.addEventListener('dragend', _clearDragging);
+document.addEventListener('drop', _clearDragging);
+document.addEventListener('mouseup', _clearDragging);
+document.addEventListener('pointerup', _clearDragging);
 
 jQuery(async () => {
     renderSettings();
