@@ -1,6 +1,6 @@
 {
     "display_name": "커서 도우미",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "js": "index.js",
     "description": "Apply animated cursors from cursors-4u.com to SillyTavern",
     "author": "SillyGgu",
